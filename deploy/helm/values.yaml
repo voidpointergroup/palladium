@@ -1,0 +1,32 @@
+apps:
+  server:
+    enabled: true
+    deployment:
+      revisions: 0
+      strategy:
+        type: Recreate
+      image:
+        ref: "harbor.chinook.k8s.voidpointergroup.com/palladium/palladium-server:nightly"
+        pull_policy: Always
+    secrets:
+      config:
+        config: |-
+          version: 0.1.0
+          server:
+            address: "0.0.0.0:8080"
+          redis:
+            endpoint: "redis://palladium-redis-master:6379"
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: 2Gi
+      existingClaim: ""

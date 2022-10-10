@@ -1,0 +1,90 @@
+name: nightly
+on:
+  workflow_dispatch:
+  schedule: [{ cron: "0 0 * * *" }]
+  push:
+    branches-ignore:
+      - "dependabot/**"
+
+jobs:
+  build:
+    name: build image
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - app: "server"
+    steps:
+      - uses: actions/checkout@v3
+      - name: install earthly
+        run: "sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/download/v0.6.14/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'"
+      - name: build image
+        working-directory: ./code
+        run: earthly +image --toolchain=nightly --sub=./apps/${{ matrix.app }} --version=0.1.0 --tag="voidpointergroup/palladium-${{ matrix.app }}:nightly"
+      - name: save image
+        run: |-
+          mkdir ./.artifacts
+          docker save voidpointergroup/palladium-${{ matrix.app }}:nightly | gzip > ./.artifacts/palladium-${{ matrix.app }}.tar.gz
+      - name: cache image
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v2
+        with:
+          name: palladium-${{ matrix.app }}.tar.gz
+          path: ./.artifacts/palladium-${{ matrix.app }}.tar.gz
+
+  publish-ghcr:
+    name: publish to ghcr (nightly)
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - app: "server"
+    steps:
+      - name: download image
+        uses: actions/download-artifact@v2
+        with:
+          name: palladium-${{ matrix.app }}.tar.gz
+          path: .artifacts
+      - name: import image
+        run: docker load --input ./.artifacts/palladium-${{ matrix.app }}.tar.gz
+      - name: publish
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com -u ${GITHUB_ACTOR} --password-stdin
+          docker tag voidpointergroup/palladium-${{ matrix.app }}:nightly docker.pkg.github.com/voidpointergroup/palladium/palladium-${{ matrix.app }}:nightly
+          docker push docker.pkg.github.com/voidpointergroup/palladium/palladium-${{ matrix.app }}:nightly
+      - name: run trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "docker.pkg.github.com/voidpointergroup/palladium/palladium-${{ matrix.app }}:nightly"
+          format: "template"
+          template: "@/contrib/sarif.tpl"
+          output: "trivy-results.sarif"
+      - name: upload trivy results
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  publish-harbor:
+    name: publish to harbor (nightly)
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - app: "server"
+    steps:
+      - name: download image
+        uses: actions/download-artifact@v2
+        with:
+          name: palladium-${{ matrix.app }}.tar.gz
+          path: .artifacts
+      - name: import image
+        run: docker load --input ./.artifacts/palladium-${{ matrix.app }}.tar.gz
+      - name: publish
+        run: |
+          echo ${{ secrets.HARBOR_PASS }} | docker login harbor.chinook.k8s.voidpointergroup.com -u ${{ secrets.HARBOR_USER }} --password-stdin
+          docker tag voidpointergroup/palladium-${{ matrix.app }}:nightly harbor.chinook.k8s.voidpointergroup.com/palladium/palladium-${{ matrix.app }}:nightly
+          docker push harbor.chinook.k8s.voidpointergroup.com/palladium/palladium-${{ matrix.app }}:nightly

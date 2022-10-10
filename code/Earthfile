@@ -1,0 +1,36 @@
+VERSION 0.6
+
+rust:
+  ARG toolchain
+
+  FROM debian:bullseye
+  RUN [ ! -z "$toolchain" ] || exit 1
+  RUN apt update -y && apt upgrade -y
+  RUN apt install gcc make build-essential curl -y
+  RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $toolchain
+  ENV PATH=/root/.cargo/bin:"$PATH"
+
+repo:
+  FROM +rust
+  WORKDIR /repo
+  COPY . .
+
+image:
+  ARG toolchain
+  ARG version
+  ARG tag
+  ARG sub
+
+  FROM DOCKERFILE \
+    -f ./$sub/docker/Dockerfile \
+    --build-arg toolchain=$toolchain \
+    --build-arg version=$version \
+    .
+  SAVE IMAGE $tag
+
+all:
+  BUILD +image --toolchain=nightly --version=0.1.0 --tag=harbor.chinook.k8s.voidpointergroup.com/palladium/palladium-server:nightly --sub=./apps/server
+
+push:
+  LOCALLY
+  RUN podman push harbor.chinook.k8s.voidpointergroup.com/palladium/palladium-server:nightly

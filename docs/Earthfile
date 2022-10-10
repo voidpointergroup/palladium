@@ -1,0 +1,12 @@
+VERSION 0.6
+
+retype:
+  FROM node:18-buster
+  RUN npm i -g retypeapp
+
+wiki:
+  FROM +retype
+  WORKDIR /app
+  COPY ./wiki .
+  RUN retype build
+  SAVE ARTIFACT .retype AS LOCAL ./.artifacts/wiki
