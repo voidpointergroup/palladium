@@ -36,10 +36,25 @@ async fn serve(config: crate::config::Config) -> std::result::Result<(), Box<dyn
         return Err(Box::new(crate::error::StartupError::new(e)));
     }
     let bind = config.server.address.clone();
+    let service = Server::new(config.clone(), redis.clone());
     HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(Server::new(config.clone(), redis.clone())))
             .service(crate::handlers::health::handler)
+            .app_data(Data::new(config.clone()))
+            .app_data(Data::new(service.clone()))
+            .service(crate::handlers::mappings::redirect)
+            .app_data(Data::new(config.clone()))
+            .app_data(Data::new(service.clone()))
+            .app_data(
+                actix_web::web::JsonConfig::default()
+                    .content_type_required(true)
+                    .content_type(|m| m == "application/json")
+                    .limit(1024 * 4), // 4kb
+            )
+            .service(crate::handlers::mappings::get_directive)
+            .app_data(Data::new(config.clone()))
+            .app_data(Data::new(service.clone()))
+            .service(crate::handlers::mappings::post_directive)
     })
     .bind(&bind)?
     .run()

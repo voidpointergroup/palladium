@@ -1,0 +1,14 @@
+{{- if .Values.apps.server.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-palladium-server
+spec:
+  type: {{ .Values.apps.server.service.type }}
+  ports:
+  - port: {{ .Values.apps.server.service.port }}
+    protocol: TCP
+    targetPort: {{ .Values.apps.server.service.port }}
+  selector:
+    app: {{ .Release.Name }}-palladium-server
+{{ end }}

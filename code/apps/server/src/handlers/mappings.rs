@@ -48,8 +48,8 @@ pub struct GetDirectiveResponse {
 
 #[actix_web::get("/directives/{directive_id}")]
 pub async fn get_directive(
-    srv: Data<Server>,
     _config: Data<Config>,
+    srv: Data<Server>,
     directive_id: Path<String>,
 ) -> Result<HttpResponse, Error> {
     let dir = srv.redirect(directive_id.clone()).await?;
@@ -67,8 +67,8 @@ pub async fn get_directive(
 
 #[actix_web::post("/directives")]
 pub async fn post_directive(
-    srv: Data<Server>,
     _config: Data<Config>,
+    srv: Data<Server>,
     body: Json<PostDirectiveRequest>,
 ) -> Result<HttpResponse, Error> {
     let id = srv
@@ -85,8 +85,8 @@ pub async fn post_directive(
 
 #[actix_web::get("/x/{directive_id}")]
 pub async fn redirect(
-    srv: Data<Server>,
     _config: Data<Config>,
+    srv: Data<Server>,
     directive_id: Path<String>,
 ) -> Result<HttpResponse, Error> {
     let dir = srv.redirect(directive_id.clone()).await?;

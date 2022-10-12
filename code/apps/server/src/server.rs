@@ -17,6 +17,7 @@ pub struct Directive {
     pub acls: DirectiveACLs,
 }
 
+#[derive(Debug, Clone)]
 pub struct Server {
     #[allow(dead_code)]
     config: crate::config::Config,
