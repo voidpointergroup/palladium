@@ -1,6 +1,9 @@
 apps:
   server:
     enabled: true
+    service:
+      type: ClusterIP
+      port: "8080"
     deployment:
       revisions: 0
       strategy:
