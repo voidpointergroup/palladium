@@ -1,15 +1,18 @@
-use std::{
-    error::Error,
-    str::FromStr,
-};
+use std::error::Error;
 
 use redis::Commands;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum DirectiveExpiry {
+    At(String),
+    Seconds(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct DirectiveACLs {
-    pub max_calls: Option<u64>,
-    pub expiry: Option<String>,
+    pub expiry: Option<DirectiveExpiry>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -53,14 +56,19 @@ impl Server {
     pub async fn register_with_id(&self, id: String, directive: Directive) -> Result<(), Box<dyn Error>> {
         let mut redis_command = &mut redis::pipe();
         redis_command = redis_command
+            .atomic()
             .cmd("SET")
             .arg(self.key(&id))
             .arg(serde_json::to_string(&directive)?);
         match directive.acls.expiry {
-            | Some(v) => {
-                let time_exp = chrono::DateTime::<chrono::Utc>::from_str(&v)?.timestamp();
-                let diff = chrono::Utc::now().timestamp() - time_exp;
-                redis_command = redis_command.cmd("EXPIRE").arg(self.key(&id)).arg(diff.to_string());
+            | Some(v) => match v {
+                | DirectiveExpiry::At(v) => {
+                    let time_exp = chrono::DateTime::parse_from_rfc3339(&v)?.timestamp();
+                    redis_command = redis_command.cmd("EXPIREAT").arg(self.key(&id)).arg(time_exp);
+                },
+                | DirectiveExpiry::Seconds(v) => {
+                    redis_command = redis_command.cmd("EXPIRE").arg(self.key(&id)).arg(v);
+                },
             },
             | None => {},
         }

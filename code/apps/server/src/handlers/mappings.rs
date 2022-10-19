@@ -17,11 +17,35 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectiveExpiry {
+    At(String),
+    Seconds(u64),
+}
+
+impl Into<crate::server::DirectiveExpiry> for DirectiveExpiry {
+    fn into(self) -> crate::server::DirectiveExpiry {
+        match self {
+            | DirectiveExpiry::At(v) => crate::server::DirectiveExpiry::At(v),
+            | DirectiveExpiry::Seconds(v) => crate::server::DirectiveExpiry::Seconds(v),
+        }
+    }
+}
+impl Into<DirectiveExpiry> for crate::server::DirectiveExpiry {
+    fn into(self) -> DirectiveExpiry {
+        match self {
+            | crate::server::DirectiveExpiry::At(v) => DirectiveExpiry::At(v),
+            | crate::server::DirectiveExpiry::Seconds(v) => DirectiveExpiry::Seconds(v),
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct PostDirectiveRequest {
     pub destination: String,
-    pub expire_at: Option<String>,
+    pub expiry: Option<DirectiveExpiry>,
     pub max_calls: Option<u64>,
 }
 
@@ -35,8 +59,7 @@ pub struct PostDirectiveResponse {
 #[serde(rename_all = "snake_case")]
 pub struct PutDirectiveRequest {
     pub destination: String,
-    pub expire_at: Option<String>,
-    pub max_calls: Option<u64>,
+    pub expiry: Option<DirectiveExpiry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -46,8 +69,7 @@ pub struct PutDirectiveResponse {}
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct GetDirectiveResponseACLs {
-    pub max_calls: Option<u64>,
-    pub expiry: Option<String>,
+    pub expiry: Option<DirectiveExpiry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -69,8 +91,10 @@ pub async fn get_directive(
         id: directive_id.to_owned(),
         url: dir.url,
         acls: GetDirectiveResponseACLs {
-            max_calls: dir.acls.max_calls,
-            expiry: dir.acls.expiry,
+            expiry: match dir.acls.expiry {
+                | Some(v) => Some(v.into()),
+                | None => None,
+            },
         },
     })?))
 }
@@ -107,8 +131,10 @@ pub async fn put_directive(
     srv.register_with_id(directive_id.to_owned(), Directive {
         url: body.destination.clone(),
         acls: DirectiveACLs {
-            max_calls: Some(2u64),
-            expiry: None,
+            expiry: match body.expiry.clone() {
+                | Some(v) => Some(v.into()),
+                | None => None,
+            },
         },
     })
     .await?;
@@ -125,8 +151,10 @@ pub async fn post_directive(
         .register(Directive {
             url: body.destination.clone(),
             acls: DirectiveACLs {
-                max_calls: Some(2u64),
-                expiry: None,
+                expiry: match body.expiry.clone() {
+                    | Some(v) => Some(v.into()),
+                    | None => None,
+                },
             },
         })
         .await?;
