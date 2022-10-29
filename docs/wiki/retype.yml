@@ -2,10 +2,10 @@ input: .
 output: .retype
 url: # Add your website address here
 branding:
-  title: hydrogen
+  title: palladium
   label: wiki
 links:
-- text: GitHub repository
-  link: https://github.com/voidpointergroup/hydrogen
+  - text: GitHub repository
+    link: https://github.com/voidpointergroup/palladium
 footer:
   copyright: "&copy; Copyright {{ year }}. All rights reserved."

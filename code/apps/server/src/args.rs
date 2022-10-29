@@ -26,9 +26,9 @@ pub struct ClapArgumentLoader {}
 impl ClapArgumentLoader {
     /// Parsing the program arguments with the `clap` trait.
     pub fn load() -> Result<CallArgs, Box<dyn Error>> {
-        let command = clap::App::new("hydrogen")
+        let command = clap::App::new("palladium")
             .version(env!("CARGO_PKG_VERSION"))
-            .about("hydrogen")
+            .about("palladium")
             .author("replicadse <aw@voidpointergroup.com>")
             .arg(
                 clap::Arg::new("experimental")
