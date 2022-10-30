@@ -17,19 +17,9 @@ apps:
           version: 0.1.0
           server:
             address: "0.0.0.0:8080"
-          redis:
-            endpoint: "redis://palladium-redis-master:6379"
+          mondogb:
+            endpoint: "mongodb://palladium-mongodb:27017"
 
-redis:
-  enabled: true
-  architecture: standalone
+mongodb:
   auth:
     enabled: false
-  master:
-    persistence:
-      enabled: true
-      storageClass: ""
-      accessModes:
-        - ReadWriteOnce
-      size: 2Gi
-      existingClaim: ""

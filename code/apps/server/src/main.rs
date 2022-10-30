@@ -30,13 +30,8 @@ async fn main() -> std::result::Result<(), Box<dyn Error>> {
 /// Main server function, starting an actix HTTP server with the various
 /// endpoints.
 async fn serve(config: crate::config::Config) -> std::result::Result<(), Box<dyn Error>> {
-    let redis = redis::Client::open(config.redis.endpoint.clone())?;
-    if let Err(e) = redis.get_connection() {
-        let e = &format!("could not connect to {}, {}", &config.redis.endpoint, e.to_string());
-        return Err(Box::new(crate::error::StartupError::new(e)));
-    }
     let bind = config.server.address.clone();
-    let service = Server::new(config.clone(), redis.clone());
+    let service = Server::new(config.clone()).await?;
     HttpServer::new(move || {
         App::new()
             .service(crate::handlers::health::handler)

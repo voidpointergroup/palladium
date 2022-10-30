@@ -101,7 +101,7 @@ pub async fn get_directive(
 
 #[actix_web::get("/directives")]
 pub async fn get_directives(_config: Data<Config>, srv: Data<Server>) -> Result<HttpResponse, Error> {
-    let keys = srv.list().await?;
+    let keys = srv.list(10, None).await?;
     Ok(HttpResponse::Ok().body(serde_json::to_string(&keys)?))
 }
 
@@ -128,7 +128,8 @@ pub async fn put_directive(
     directive_id: Path<String>,
     body: Json<PutDirectiveRequest>,
 ) -> Result<HttpResponse, Error> {
-    srv.register_with_id(directive_id.to_owned(), Directive {
+    srv.register(Directive {
+        id: directive_id.clone(),
         url: body.destination.clone(),
         acls: DirectiveACLs {
             expiry: match body.expiry.clone() {
@@ -147,17 +148,18 @@ pub async fn post_directive(
     srv: Data<Server>,
     body: Json<PostDirectiveRequest>,
 ) -> Result<HttpResponse, Error> {
-    let id = srv
-        .register(Directive {
-            url: body.destination.clone(),
-            acls: DirectiveACLs {
-                expiry: match body.expiry.clone() {
-                    | Some(v) => Some(v.into()),
-                    | None => None,
-                },
+    let id = srv.claim_id().await?;
+    srv.register(Directive {
+        id: id.clone(),
+        url: body.destination.clone(),
+        acls: DirectiveACLs {
+            expiry: match body.expiry.clone() {
+                | Some(v) => Some(v.into()),
+                | None => None,
             },
-        })
-        .await?;
+        },
+    })
+    .await?;
     Ok(HttpResponse::Created().body(serde_json::to_string(&PostDirectiveResponse { id })?))
 }
 

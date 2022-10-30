@@ -3,7 +3,7 @@
 pub struct Config {
     pub version: String,
     pub server: Server,
-    pub redis: Redis,
+    pub mongodb: MongoDB,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -14,6 +14,6 @@ pub struct Server {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct Redis {
+pub struct MongoDB {
     pub endpoint: String,
 }
