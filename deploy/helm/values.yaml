@@ -17,7 +17,7 @@ apps:
           version: 0.1.0
           server:
             address: "0.0.0.0:8080"
-          mondogb:
+          mongodb:
             endpoint: "mongodb://palladium-mongodb:27017"
 
 mongodb:

@@ -18,7 +18,7 @@ pub struct DirectiveACLs {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Directive {
-    #[serde(alias = "_id")]
+    #[serde(rename = "_id")]
     pub id: String,
     pub url: String,
     pub acls: DirectiveACLs,
