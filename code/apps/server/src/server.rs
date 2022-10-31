@@ -40,9 +40,7 @@ impl Server {
             coll.create_index(
                 mongodb::IndexModel::builder()
                     .keys(doc! {
-                        "acls": {
-                            "expire_at": 1
-                        }
+                        "acls.expire_at": 1
                     })
                     .options(Some(
                         mongodb::options::IndexOptions::builder()
