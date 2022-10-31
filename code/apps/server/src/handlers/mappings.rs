@@ -3,6 +3,7 @@ use actix_web::{
         Data,
         Json,
         Path,
+        Query,
     },
     Error,
     HttpResponse,
@@ -17,35 +18,11 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DirectiveExpiry {
-    At(String),
-    Seconds(u64),
-}
-
-impl Into<crate::server::DirectiveExpiry> for DirectiveExpiry {
-    fn into(self) -> crate::server::DirectiveExpiry {
-        match self {
-            | DirectiveExpiry::At(v) => crate::server::DirectiveExpiry::At(v),
-            | DirectiveExpiry::Seconds(v) => crate::server::DirectiveExpiry::Seconds(v),
-        }
-    }
-}
-impl Into<DirectiveExpiry> for crate::server::DirectiveExpiry {
-    fn into(self) -> DirectiveExpiry {
-        match self {
-            | crate::server::DirectiveExpiry::At(v) => DirectiveExpiry::At(v),
-            | crate::server::DirectiveExpiry::Seconds(v) => DirectiveExpiry::Seconds(v),
-        }
-    }
-}
-
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct PostDirectiveRequest {
     pub destination: String,
-    pub expiry: Option<DirectiveExpiry>,
+    pub expire: Option<String>,
     pub max_calls: Option<u64>,
 }
 
@@ -59,7 +36,7 @@ pub struct PostDirectiveResponse {
 #[serde(rename_all = "snake_case")]
 pub struct PutDirectiveRequest {
     pub destination: String,
-    pub expiry: Option<DirectiveExpiry>,
+    pub expire: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -69,7 +46,7 @@ pub struct PutDirectiveResponse {}
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct GetDirectiveResponseACLs {
-    pub expiry: Option<DirectiveExpiry>,
+    pub expire_at: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -86,22 +63,24 @@ pub async fn get_directive(
     srv: Data<Server>,
     directive_id: Path<String>,
 ) -> Result<HttpResponse, Error> {
-    let dir = srv.redirect(directive_id.clone()).await?;
+    let dir = srv.read(directive_id.clone()).await?;
     Ok(HttpResponse::Ok().body(serde_json::to_string(&GetDirectiveResponse {
         id: directive_id.to_owned(),
         url: dir.url,
         acls: GetDirectiveResponseACLs {
-            expiry: match dir.acls.expiry {
-                | Some(v) => Some(v.into()),
-                | None => None,
-            },
+            expire_at: dir.acls.expire_at,
         },
     })?))
 }
 
 #[actix_web::get("/directives")]
-pub async fn get_directives(_config: Data<Config>, srv: Data<Server>) -> Result<HttpResponse, Error> {
-    let keys = srv.list(10, None).await?;
+pub async fn get_directives(
+    _config: Data<Config>,
+    srv: Data<Server>,
+    next: Query<u16>,
+    cursor: Query<Option<String>>,
+) -> Result<HttpResponse, Error> {
+    let keys = srv.list(*next, cursor.0).await?;
     Ok(HttpResponse::Ok().body(serde_json::to_string(&keys)?))
 }
 
@@ -132,10 +111,7 @@ pub async fn put_directive(
         id: directive_id.clone(),
         url: body.destination.clone(),
         acls: DirectiveACLs {
-            expiry: match body.expiry.clone() {
-                | Some(v) => Some(v.into()),
-                | None => None,
-            },
+            expire_at: body.expire.clone(),
         },
     })
     .await?;
@@ -153,10 +129,7 @@ pub async fn post_directive(
         id: id.clone(),
         url: body.destination.clone(),
         acls: DirectiveACLs {
-            expiry: match body.expiry.clone() {
-                | Some(v) => Some(v.into()),
-                | None => None,
-            },
+            expire_at: body.expire.clone(),
         },
     })
     .await?;
