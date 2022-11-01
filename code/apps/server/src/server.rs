@@ -7,8 +7,24 @@ use mongodb::bson::doc;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub struct DirectiveACLCalls {
+    pub max: Option<u32>,
+    pub curr: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DirectiveACLAuth {
+    pub key: String,
+    pub secret: String,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct DirectiveACLs {
     pub expire_at: Option<String>,
+    pub calls: DirectiveACLCalls,
+    pub auth: Option<DirectiveACLAuth>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -121,15 +137,39 @@ impl Server {
             .ok_or(Box::new(crate::error::Runtime::new("not found")))
     }
 
-    pub async fn redirect(&self, id: String) -> Result<Directive, Box<dyn Error>> {
-        self.directives
+    pub async fn redirect(&self, id: String, auth: Option<(String, String)>) -> Result<Directive, Box<dyn Error>> {
+        let dir = self
+            .directives
             .find_one(
                 doc! {
-                    "_id": id,
+                    "_id": id.clone(),
                 },
                 None,
             )
             .await?
-            .ok_or(Box::new(crate::error::Runtime::new("not found")))
+            .ok_or(Box::new(crate::error::Runtime::new("not found")))?;
+
+        if let Some(dir_auth) = &dir.acls.auth {
+            let given_auth = auth.ok_or(crate::error::Runtime::new("missing auth"))?;
+            if dir_auth.key != given_auth.0 || dir_auth.secret != given_auth.1 {
+                return Err(Box::new(crate::error::Runtime::new("invalid credentials")));
+            }
+        }
+
+        self.directives
+            .update_one(
+                doc! {
+                    "_id": id.clone(),
+                },
+                mongodb::options::UpdateModifications::Document(doc! {
+                    "$inc": {
+                        "acls.calls.curr": 1
+                    }
+                }),
+                None,
+            )
+            .await?;
+
+        Ok(dir)
     }
 }

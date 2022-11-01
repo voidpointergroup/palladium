@@ -43,15 +43,6 @@ async fn serve(config: crate::config::Config) -> std::result::Result<(), Box<dyn
             .service(crate::handlers::mappings::get_directive)
             .app_data(Data::new(config.clone()))
             .app_data(Data::new(service.clone()))
-            .app_data(
-                actix_web::web::JsonConfig::default()
-                    .content_type_required(true)
-                    .content_type(|m| m == "application/json")
-                    .limit(1024 * 4), // 4kb
-            )
-            .service(crate::handlers::mappings::put_directive)
-            .app_data(Data::new(config.clone()))
-            .app_data(Data::new(service.clone()))
             .service(crate::handlers::mappings::delete_directive)
             .app_data(Data::new(config.clone()))
             .app_data(Data::new(service.clone()))

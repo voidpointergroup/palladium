@@ -6,6 +6,7 @@ use actix_web::{
         Query,
     },
     Error,
+    HttpRequest,
     HttpResponse,
 };
 
@@ -13,6 +14,8 @@ use crate::{
     config::Config,
     server::{
         Directive,
+        DirectiveACLAuth,
+        DirectiveACLCalls,
         DirectiveACLs,
         Server,
     },
@@ -20,10 +23,18 @@ use crate::{
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub struct PostDirectiveRequestAuth {
+    pub key: String,
+    pub secret: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct PostDirectiveRequest {
     pub destination: String,
     pub expire: Option<String>,
     pub max_calls: Option<u64>,
+    pub auth: Option<PostDirectiveRequestAuth>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -31,17 +42,6 @@ pub struct PostDirectiveRequest {
 pub struct PostDirectiveResponse {
     pub id: String,
 }
-
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct PutDirectiveRequest {
-    pub destination: String,
-    pub expire: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub struct PutDirectiveResponse {}
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,14 +73,19 @@ pub async fn get_directive(
     })?))
 }
 
+#[derive(serde::Deserialize)]
+pub struct GetDirectivesQueryParams {
+    next: u16,
+    cursor: Option<String>,
+}
+
 #[actix_web::get("/directives")]
 pub async fn get_directives(
     _config: Data<Config>,
     srv: Data<Server>,
-    next: Query<u16>,
-    cursor: Query<Option<String>>,
+    Query(query): Query<GetDirectivesQueryParams>,
 ) -> Result<HttpResponse, Error> {
-    let keys = srv.list(*next, cursor.0).await?;
+    let keys = srv.list(query.next, query.cursor).await?;
     Ok(HttpResponse::Ok().body(serde_json::to_string(&keys)?))
 }
 
@@ -100,24 +105,6 @@ pub async fn delete_directives(_config: Data<Config>, srv: Data<Server>) -> Resu
     Ok(HttpResponse::Ok().body(""))
 }
 
-#[actix_web::put("/directives/{directive_id}")]
-pub async fn put_directive(
-    _config: Data<Config>,
-    srv: Data<Server>,
-    directive_id: Path<String>,
-    body: Json<PutDirectiveRequest>,
-) -> Result<HttpResponse, Error> {
-    srv.register(Directive {
-        id: directive_id.clone(),
-        url: body.destination.clone(),
-        acls: DirectiveACLs {
-            expire_at: body.expire.clone(),
-        },
-    })
-    .await?;
-    Ok(HttpResponse::Created().body(serde_json::to_string(&PutDirectiveResponse {})?))
-}
-
 #[actix_web::post("/directives")]
 pub async fn post_directive(
     _config: Data<Config>,
@@ -125,11 +112,22 @@ pub async fn post_directive(
     body: Json<PostDirectiveRequest>,
 ) -> Result<HttpResponse, Error> {
     let id = srv.claim_id().await?;
+
+    let auth = match &body.auth {
+        | Some(v) => Some(DirectiveACLAuth {
+            key: v.key.to_owned(),
+            secret: v.secret.to_owned(),
+        }),
+        | None => None,
+    };
+
     srv.register(Directive {
         id: id.clone(),
         url: body.destination.clone(),
         acls: DirectiveACLs {
             expire_at: body.expire.clone(),
+            calls: DirectiveACLCalls { max: None, curr: 0 },
+            auth,
         },
     })
     .await?;
@@ -139,10 +137,20 @@ pub async fn post_directive(
 #[actix_web::get("/x/{directive_id}")]
 pub async fn redirect(
     _config: Data<Config>,
+    request: HttpRequest,
     srv: Data<Server>,
     directive_id: Path<String>,
 ) -> Result<HttpResponse, Error> {
-    let dir = srv.redirect(directive_id.clone()).await?;
+    let auth_header = request.headers().get("Authorization");
+    let auth = match auth_header {
+        | Some(v) => {
+            let decoded_auth = String::from_utf8(base64::decode(v).unwrap()).unwrap();
+            let da_parts: Vec<&str> = decoded_auth.split(":").collect();
+            Some((da_parts[0].to_owned(), da_parts[1].to_owned()))
+        },
+        | None => None,
+    };
+    let dir = srv.redirect(directive_id.clone(), auth).await?;
     Ok(HttpResponse::TemporaryRedirect()
         .append_header(("Location", dir.url))
         .body(""))
